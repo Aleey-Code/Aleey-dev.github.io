@@ -1,44 +1,86 @@
-/* Ali portfolio: code rain, typed roles, scroll reveal, tilt effects, copy buttons. */
+/* Ali portfolio: network background, typed roles, scroll reveal, tilt effects, copy buttons. */
 (function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  /* ---- code rain ---- */
-  var c = document.getElementById('rain');
-  var ctx = c.getContext('2d');
-  var toks = ['0', '1', '{', '}', '</>', '=>', 'def', 'py', 'php', 'css', 'div', '()', '[]', '$', '::', 'if', 'for', ';', 'html', '&&', 'import', '<?', '?>', 'ret'];
-  var COL = 26, FS = 15, w = 0, h = 0, drops = [], dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  var cols = ['rgba(39,232,255,0.6)', 'rgba(39,232,255,0.6)', 'rgba(39,232,255,0.6)', 'rgba(123,92,255,0.6)', 'rgba(255,61,240,0.55)'];
-  function size() {
-    w = window.innerWidth; h = window.innerHeight;
-    c.width = Math.floor(w * dpr); c.height = Math.floor(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#04050c'; ctx.fillRect(0, 0, w, h);
-    var n = Math.ceil(w / COL);
-    drops = [];
-    for (var i = 0; i < n; i++) drops.push({ y: Math.random() * -40, s: 0.22 + Math.random() * 0.55, c: cols[(Math.random() * cols.length) | 0] });
+  /* ---- network background: drifting nodes, glowing links, travelling signal pulses ---- */
+  var net = document.getElementById('net'), nctx = net.getContext('2d');
+  var nw = 0, nh = 0, ndpr = Math.min(window.devicePixelRatio || 1, 1.5), LINK = 150;
+  var nodes = [], pulses = [], mouse = { x: -999, y: -999 }, NCOL = ['39,232,255', '123,92,255', '255,61,240'], ntimer;
+  function nsize() {
+    nw = window.innerWidth; nh = window.innerHeight;
+    net.width = Math.floor(nw * ndpr); net.height = Math.floor(nh * ndpr);
+    nctx.setTransform(ndpr, 0, 0, ndpr, 0, 0);
+    LINK = nw < 600 ? 120 : 170;
+    var n = Math.max(40, Math.min(110, Math.round(nw * nh / 12000)));
+    nodes = []; pulses = [];
+    for (var i = 0; i < n; i++) nodes.push({ x: Math.random() * nw, y: Math.random() * nh, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, r: 1.2 + Math.random() * 1.8, c: NCOL[i % 3], p: Math.random() * 6 });
   }
-  function step() {
-    ctx.fillStyle = 'rgba(4,5,12,0.13)'; ctx.fillRect(0, 0, w, h);
-    ctx.font = FS + 'px "JetBrains Mono", monospace';
-    for (var i = 0; i < drops.length; i++) {
-      var d = drops[i], x = i * COL, y = d.y * FS;
-      var prev = toks[(Math.random() * toks.length) | 0];
-      ctx.fillStyle = d.c; ctx.fillText(prev, x, y - FS);
-      ctx.fillStyle = 'rgba(225,255,255,0.95)'; ctx.fillText(toks[(Math.random() * toks.length) | 0], x, y);
-      d.y += d.s;
-      if (y > h && Math.random() > 0.97) { d.y = Math.random() * -20; d.s = 0.22 + Math.random() * 0.55; }
+  function spawnPulse() {
+    if (pulses.length > 7) return;
+    var a = nodes[(Math.random() * nodes.length) | 0], near = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var b = nodes[i]; if (b === a) continue;
+      var dx = a.x - b.x, dy = a.y - b.y;
+      if (dx * dx + dy * dy < LINK * LINK) near.push(b);
+    }
+    if (near.length) pulses.push({ a: a, b: near[(Math.random() * near.length) | 0], t: 0, s: 0.012 + Math.random() * 0.014 });
+  }
+  function nframe(move, ts) {
+    nctx.clearRect(0, 0, nw, nh);
+    var i, j, a, b, dx, dy, d, al, L2 = LINK * LINK;
+    for (i = 0; i < nodes.length; i++) {
+      a = nodes[i];
+      if (!move) continue;
+      a.x += a.vx; a.y += a.vy;
+      if (a.x < -20) a.x = nw + 20; else if (a.x > nw + 20) a.x = -20;
+      if (a.y < -20) a.y = nh + 20; else if (a.y > nh + 20) a.y = -20;
+      dx = a.x - mouse.x; dy = a.y - mouse.y; d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 150 && d > 0.1) { a.x += dx / d * (150 - d) * 0.025; a.y += dy / d * (150 - d) * 0.025; }
+    }
+    nctx.lineWidth = 0.8;
+    for (i = 0; i < nodes.length; i++) {
+      a = nodes[i];
+      for (j = i + 1; j < nodes.length; j++) {
+        b = nodes[j]; dx = a.x - b.x; dy = a.y - b.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < L2) {
+          al = (1 - Math.sqrt(d2) / LINK) * 0.55;
+          nctx.strokeStyle = 'rgba(' + a.c + ',' + al.toFixed(3) + ')';
+          nctx.beginPath(); nctx.moveTo(a.x, a.y); nctx.lineTo(b.x, b.y); nctx.stroke();
+        }
+      }
+      dx = a.x - mouse.x; dy = a.y - mouse.y; d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 190) {
+        nctx.strokeStyle = 'rgba(180,250,255,' + ((1 - d / 190) * 0.7).toFixed(3) + ')';
+        nctx.beginPath(); nctx.moveTo(a.x, a.y); nctx.lineTo(mouse.x, mouse.y); nctx.stroke();
+      }
+    }
+    var t = (ts || 0) / 1000;
+    for (i = 0; i < nodes.length; i++) {
+      a = nodes[i]; var rr = a.r * (1 + 0.3 * Math.sin(t * 1.6 + a.p));
+      nctx.fillStyle = 'rgba(' + a.c + ',0.2)'; nctx.beginPath(); nctx.arc(a.x, a.y, rr * 5, 0, 6.2832); nctx.fill();
+      nctx.fillStyle = 'rgba(' + a.c + ',0.95)'; nctx.beginPath(); nctx.arc(a.x, a.y, rr, 0, 6.2832); nctx.fill();
+    }
+    if (move) {
+      if (Math.random() < 0.07) spawnPulse();
+      for (i = pulses.length - 1; i >= 0; i--) {
+        var p = pulses[i]; p.t += p.s;
+        dx = p.a.x - p.b.x; dy = p.a.y - p.b.y;
+        if (p.t >= 1 || dx * dx + dy * dy > L2 * 1.5) { pulses.splice(i, 1); continue; }
+        var px = p.a.x + (p.b.x - p.a.x) * p.t, py = p.a.y + (p.b.y - p.a.y) * p.t;
+        nctx.fillStyle = 'rgba(' + p.a.c + ',0.22)'; nctx.beginPath(); nctx.arc(px, py, 9, 0, 6.2832); nctx.fill();
+        nctx.fillStyle = 'rgba(255,255,255,0.95)'; nctx.beginPath(); nctx.arc(px, py, 2.4, 0, 6.2832); nctx.fill();
+      }
     }
   }
-  var last = 0, timer;
-  function loop(t) { if (t - last > 48) { step(); last = t; } requestAnimationFrame(loop); }
-  function start() {
-    size();
-    for (var i = 0; i < (reduce ? 160 : 70); i++) step();
-    if (!reduce && !start.run) { start.run = true; requestAnimationFrame(loop); }
-  }
-  start();
-  window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(start, 200); });
+  function nloop(ts) { nframe(true, ts); requestAnimationFrame(nloop); }
+  nsize();
+  if (reduce) { nframe(false, 0); } else { requestAnimationFrame(nloop); }
+  window.addEventListener('resize', function () { clearTimeout(ntimer); ntimer = setTimeout(function () { nsize(); if (reduce) nframe(false, 0); }, 200); });
+  window.addEventListener('pointermove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+  window.addEventListener('pointerup', function (e) { if (e.pointerType !== 'mouse') { mouse.x = -999; mouse.y = -999; } });
+  document.documentElement.addEventListener('pointerleave', function () { mouse.x = -999; mouse.y = -999; });
 
   /* ---- typed roles ---- */
   var roles = ['Website Developer', 'Python Developer', 'Digital Marketer', 'Social Media Manager'];
@@ -112,4 +154,105 @@
       } else { fallback(); }
     });
   });
+  /* ---- contact form ---- */
+  (function () {
+    var form = document.getElementById('cform');
+    if (!form) return;
+    var ENDPOINT = 'https://formsubmit.co/ajax/headshotboy619@gmail.com';
+    var WA_NUMBER = '923284874485';
+    var fName = document.getElementById('f-name'), fMail = document.getElementById('f-mail'), fMsg = document.getElementById('f-msg');
+    var send = document.getElementById('send'), wa = document.getElementById('wa'), stat = document.getElementById('fstatus');
+    var sent = document.getElementById('sent'), again = document.getElementById('again'), burst = document.getElementById('burst');
+    var cnt = document.getElementById('cnt'), hp = form.querySelector('.hp');
+    var rules = [
+      [fName, 'e-name', function (v) { return v.trim().length >= 2 ? '' : 'Please enter your name.'; }],
+      [fMail, 'e-mail', function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? '' : 'Enter a valid email address.'; }],
+      [fMsg, 'e-msg', function (v) { return v.trim().length >= 10 ? '' : 'Write at least 10 characters.'; }]
+    ];
+    function setErr(r, msg) {
+      var field = r[0].closest('.field');
+      document.getElementById(r[1]).textContent = msg;
+      r[0].setAttribute('aria-invalid', msg ? 'true' : 'false');
+      field.classList.remove('bad');
+      if (msg) { void field.offsetWidth; field.classList.add('bad'); }
+    }
+    function check(r) { var m = r[2](r[0].value); setErr(r, m); return !m; }
+    rules.forEach(function (r) {
+      r[0].addEventListener('input', function () { if (r[0].closest('.field').classList.contains('bad')) check(r); });
+      r[0].addEventListener('blur', function () { if (r[0].value) check(r); });
+    });
+    fMsg.addEventListener('input', function () { cnt.textContent = fMsg.value.length + ' / 1000'; });
+    function topic() { var t = form.querySelector('input[name="topic"]:checked'); return t ? t.value : ''; }
+    function status(msg, isErr) { stat.textContent = msg; stat.className = 'f-status' + (isErr ? ' error' : ''); }
+    function makeBurst() {
+      burst.innerHTML = '';
+      var cols = ['#27e8ff', '#7b5cff', '#ff3df0', '#3dffb0'];
+      for (var i = 0; i < 26; i++) {
+        var a = (i / 26) * Math.PI * 2 + Math.random() * 0.4, d = 90 + Math.random() * 90, p = document.createElement('i');
+        p.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
+        p.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
+        p.style.setProperty('--c', cols[i % 4]);
+        p.style.animationDelay = (Math.random() * 0.12).toFixed(2) + 's';
+        burst.appendChild(p);
+      }
+    }
+    function showSent() {
+      makeBurst(); sent.classList.add('show'); sent.setAttribute('aria-hidden', 'false');
+      try { again.focus({ preventScroll: true }); } catch (e) {}
+    }
+    function reset() {
+      form.reset(); cnt.textContent = '0 / 1000';
+      rules.forEach(function (r) { setErr(r, ''); });
+      status(''); wa.classList.remove('nudge');
+      sent.classList.remove('show'); sent.setAttribute('aria-hidden', 'true');
+      try { fName.focus({ preventScroll: true }); } catch (e) {}
+    }
+    again.addEventListener('click', reset);
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var firstBad = null;
+      rules.forEach(function (r) { if (!check(r) && !firstBad) firstBad = r[0]; });
+      if (firstBad) { firstBad.focus(); status('Please fix the highlighted fields.', true); return; }
+      status('');
+      if (hp && hp.value) { showSent(); return; }
+      var payload = {
+        name: fName.value.trim(), email: fMail.value.trim(), topic: topic() || 'Not chosen', message: fMsg.value.trim(),
+        _subject: 'New portfolio message from ' + fName.value.trim(), _template: 'table', _captcha: 'false'
+      };
+      var lbl = send.querySelector('.lbl');
+      send.disabled = true; send.classList.add('is-sending'); lbl.textContent = 'Sending...';
+      var ctl = window.AbortController ? new AbortController() : null;
+      var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 15000);
+      fetch(ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload), signal: ctl ? ctl.signal : undefined
+      })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            if (!res.ok || data.success === false || data.success === 'false') throw new Error('send failed');
+          });
+        })
+        .then(function () { showSent(); })
+        .catch(function () {
+          status('The message could not be sent. Please use the WhatsApp button or email me directly.', true);
+          wa.classList.remove('nudge'); void wa.offsetWidth; wa.classList.add('nudge');
+        })
+        .then(function () { clearTimeout(timer); send.disabled = false; send.classList.remove('is-sending'); lbl.textContent = 'Send message'; });
+    });
+
+    wa.addEventListener('click', function () {
+      var n = fName.value.trim(), m = fMsg.value.trim(), t = topic(), em = fMail.value.trim();
+      var text = 'Hi Ali, ' + (n ? "I'm " + n + '. ' : '') + (t ? 'I need help with: ' + t + '.\n' : '') + (m ? m + '\n' : '') + (em ? 'My email: ' + em : '');
+      window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(text.trim()), '_blank', 'noopener');
+    });
+
+    if (fine && !reduce) {
+      var wrapEl = document.getElementById('fwrap');
+      wrapEl.addEventListener('pointermove', function (e) {
+        var r = wrapEl.getBoundingClientRect();
+        form.style.setProperty('--fx', (e.clientX - r.left) + 'px'); form.style.setProperty('--fy', (e.clientY - r.top) + 'px');
+      });
+    }
+  })();
 })();
